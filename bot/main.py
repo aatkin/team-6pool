@@ -8,10 +8,6 @@ from sc2.constants import *
 from sc2.player import Bot, Computer
 
 
-def seconds_to_ticks(s):
-    return s * 21.5
-
-
 class MyBot(sc2.BotAI):
     with open(Path(__file__).parent / "../botinfo.json") as f:
         NAME = json.load(f)["name"]
@@ -79,11 +75,12 @@ class MyBot(sc2.BotAI):
             if sp.exists and self.minerals >= 100 and not self.speedlings:
                 await self.do(sp.first(RESEARCH_ZERGLINGMETABOLICBOOST))
                 self.speedlings = True
-                self.speedlings_started = iteration
+                self.speedlings_started = self.state.game_loop
 
         if self.vespene >= 100:
             evo = self.units(EVOLUTIONCHAMBER).ready
             if evo.exists and not self.melee1 and self.minerals >= 100:
+                pprint(vars(evo))
                 await self.do(evo.first(RESEARCH_ZERGMELEEWEAPONSLEVEL1))
                 self.melee1 = True
 
@@ -97,7 +94,7 @@ class MyBot(sc2.BotAI):
             if larvae.exists and self.can_afford(ZERGLING):
                 await self.do(larvae.random.train(ZERGLING))
 
-        if self.speedlings and iteration - self.speedlings_started > seconds_to_ticks(20):
+        if self.speedlings and (self.state.game_loop - self.speedlings_started) > 1800:
             target = self.known_enemy_structures.random_or(self.enemy_start_locations[0]).position
             for zl in self.units(ZERGLING).idle:
                 await self.do(zl.attack(target))
