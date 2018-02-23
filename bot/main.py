@@ -22,6 +22,7 @@ class MyBot(sc2.BotAI):
     async def on_step(self, iteration):
         hatchery = self.units(HATCHERY).ready.first
         larvae = self.units(LARVA)
+        minerals_nicely_saturated = hatchery.ideal_harvesters - hatchery.assigned_harvesters <= 1
 
         if iteration % 100 == 0:
             pprint(vars(self))
@@ -36,10 +37,26 @@ class MyBot(sc2.BotAI):
             if self.can_afford(OVERLORD) and larvae.exists:
                 await self.do(larvae.random.train(OVERLORD))
 
-        if self.drone_counter < 5:
+        if not minerals_nicely_saturated:
             if self.can_afford(DRONE) and self.supply_left >= 1 and larvae.exists:
                 self.drone_counter += 1
                 await self.do(larvae.random.train(DRONE))
+
+        # move workers to gas if havent done that yet
+        if self.units(EXTRACTOR).ready.exists:
+            extractor = self.units(EXTRACTOR).first
+
+            required_harvesters = max(0, extractor.ideal_harvesters - extractor.assigned_harvesters)
+            for drone in self.workers.random_group_of(required_harvesters):
+                await self.do(drone.gather(extractor))
+
+        if not self.already_pending(EXTRACTOR) and len(self.units(EXTRACTOR)) < 1 and minerals_nicely_saturated:
+            if self.can_afford(EXTRACTOR):
+                drone = self.workers.random
+                target = self.state.vespene_geyser.closest_to(drone.position)
+                err = await self.do(drone.build(EXTRACTOR, target))
+                if not err:
+                    self.extractor_started = True
 
         if not self.units(SPAWNINGPOOL) and not self.already_pending(SPAWNINGPOOL):
             if self.can_afford(SPAWNINGPOOL):
