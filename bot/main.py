@@ -80,7 +80,6 @@ class MyBot(sc2.BotAI):
         if self.vespene >= 100:
             evo = self.units(EVOLUTIONCHAMBER).ready
             if evo.exists and not self.melee1 and self.minerals >= 100:
-                pprint(vars(evo))
                 await self.do(evo.first(RESEARCH_ZERGMELEEWEAPONSLEVEL1))
                 self.melee1 = True
 
