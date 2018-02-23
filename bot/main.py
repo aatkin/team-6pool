@@ -22,11 +22,13 @@ class MyBot(sc2.BotAI):
         self.armor1 = False
         self.queen_counter = 0
         self.hatchery_count = 1
+        self.extractor_started = False
 
     async def on_step(self, iteration):
         hatchery = self.units(HATCHERY).ready.closest_to(self.workers[0].position)
         larvae = self.units(LARVA)
-        minerals_nicely_saturated = hatchery.ideal_harvesters - hatchery.assigned_harvesters <= 1
+        minerals_nicely_saturated = (hatchery.ideal_harvesters - hatchery.assigned_harvesters) <= 0
+        should_spawn_overlord = self.supply_left <= 2 and not self.already_pending(OVERLORD) and self.drone_counter != 0
 
         # if iteration % 100 == 0:
         #     print("start", self.game_info.start_locations[0])
@@ -43,7 +45,7 @@ class MyBot(sc2.BotAI):
             if self.can_afford(OVERLORD) and larvae.exists:
                 await self.do(larvae.random.train(OVERLORD))
 
-        if not minerals_nicely_saturated:
+        if not minerals_nicely_saturated and not self.already_pending(DRONE) and not should_spawn_overlord:
             if self.can_afford(DRONE) and self.supply_left >= 1 and larvae.exists:
                 self.drone_counter += 1
                 await self.do(larvae.random.train(DRONE))
@@ -56,7 +58,7 @@ class MyBot(sc2.BotAI):
             for drone in self.workers.random_group_of(required_harvesters):
                 await self.do(drone.gather(extractor))
 
-        if not self.already_pending(EXTRACTOR) and len(self.units(EXTRACTOR)) < 1 and minerals_nicely_saturated:
+        if not self.already_pending(EXTRACTOR) and not self.units(EXTRACTOR).ready.exists and not should_spawn_overlord and not self.extractor_started:
             if self.can_afford(EXTRACTOR):
                 drone = self.workers.random
                 target = self.state.vespene_geyser.closest_to(drone.position)
@@ -88,19 +90,19 @@ class MyBot(sc2.BotAI):
                 self.speedlings = True
                 self.speedlings_started = self.state.game_loop
 
-        if self.vespene >= 100:
+        if self.vespene >= 100 and self.speedlings:
             evo = self.units(EVOLUTIONCHAMBER).ready
             if evo.exists and not self.melee1 and self.minerals >= 100:
                 await self.do(evo.first(RESEARCH_ZERGMELEEWEAPONSLEVEL1))
                 self.melee1 = True
 
-        if self.vespene >= 150:
+        if self.vespene >= 150 and self.speedlings:
             evo = self.units(EVOLUTIONCHAMBER).ready
             if evo.exists and not self.armor1 and self.minerals >= 150:
                 await self.do(evo.first(RESEARCH_ZERGGROUNDARMORLEVEL1))
                 self.armor1 = True
 
-        if self.units(SPAWNINGPOOL).ready.exists:
+        if self.units(SPAWNINGPOOL).ready.exists and minerals_nicely_saturated and not should_spawn_overlord:
             if larvae.exists and self.can_afford(ZERGLING):
                 await self.do(larvae.random.train(ZERGLING))
 
@@ -112,7 +114,7 @@ class MyBot(sc2.BotAI):
             for p in expansions_pos:
                 if p == enemy_start: continue
                 dist = math.sqrt((p[0] - enemy_start[0]) ** 2 + (p[1] - enemy_start[1]) ** 2)
-                if dist < min_dist and dist > 10:
+                if dist < min_dist and dist > 8:
                     min_dist = dist
                     closest = Point2(p).towards(self.game_info.map_center, 5)
 
