@@ -24,12 +24,14 @@ class MyBot(sc2.BotAI):
         self.hatchery_count = 1
 
     async def on_step(self, iteration):
-        hatchery = self.units(HATCHERY).ready.closest_to(self.game_info.start_locations[0])
+        hatchery = self.units(HATCHERY).ready.closest_to(self.workers[0].position)
         larvae = self.units(LARVA)
         minerals_nicely_saturated = hatchery.ideal_harvesters - hatchery.assigned_harvesters <= 1
 
         # if iteration % 100 == 0:
-        #     pprint(vars(self))
+        #     print("start", self.game_info.start_locations[0])
+        #     print("hatch", hatchery.position)
+        #     print("drone count", self.drone_counter)
 
         if iteration == 0:
             await self.chat_send(f"Name: {self.NAME}")
@@ -41,7 +43,7 @@ class MyBot(sc2.BotAI):
             if self.can_afford(OVERLORD) and larvae.exists:
                 await self.do(larvae.random.train(OVERLORD))
 
-        if not minerals_nicely_saturated and self.drone_counter < 10:
+        if not minerals_nicely_saturated:
             if self.can_afford(DRONE) and self.supply_left >= 1 and larvae.exists:
                 self.drone_counter += 1
                 await self.do(larvae.random.train(DRONE))
