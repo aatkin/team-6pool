@@ -8,16 +8,18 @@ from sc2.constants import *
 from sc2.player import Bot, Computer
 
 
-def seconds_to_ticks(s):
-    return s * 21.5
-
-def count_units(self, unit):
-    all_units = self.units(unit).ready.amount + self.units(unit).not_ready.amount
-    return all_units
-
 class MyBot(sc2.BotAI):
     with open(Path(__file__).parent / "../botinfo.json") as f:
         NAME = json.load(f)["name"]
+
+    def __init__(self):
+        self.drone_counter = 0
+        self.speedlings = False
+        self.speedlings_started = 0
+        self.melee1 = False
+        self.armor1 = False
+        self.queen_counter = 0
+        self.expansion_counter = 0
 
     async def create_queens(self, iteration, hatchery):
         if self.can_afford(QUEEN) and self.queen_counter < 2:
@@ -49,13 +51,8 @@ class MyBot(sc2.BotAI):
             for drone in self.workers.random_group_of(required_harvesters):
                 await self.do(drone.gather(extractor))
 
-    def __init__(self):
-        self.drone_counter = 0
-        self.queen_counter = 0
-        self.expansion_counter = 0
-
     async def on_step(self, iteration):
-        # hatchery = self.units(HATCHERY).ready.first
+        hatchery = self.units(HATCHERY).ready.first
         larvae = self.units(LARVA)
 
         if iteration % 100 == 0:
@@ -67,16 +64,43 @@ class MyBot(sc2.BotAI):
         if iteration == 666:
             await self.chat_send("666 HELLFIRE")
 
-        # build more overlords
         if self.supply_left < 3 and not self.already_pending(OVERLORD):
             if self.can_afford(OVERLORD) and larvae.exists:
                 await self.do(larvae.random.train(OVERLORD))
+
+        if self.vespene >= 100:
+            sp = self.units(SPAWNINGPOOL).ready
+            if sp.exists and self.minerals >= 100 and not self.speedlings:
+                await self.do(sp.first(RESEARCH_ZERGLINGMETABOLICBOOST))
+                self.speedlings = True
+                self.speedlings_started = self.state.game_loop
+
+        if self.vespene >= 100:
+            evo = self.units(EVOLUTIONCHAMBER).ready
+            if evo.exists and not self.melee1 and self.minerals >= 100:
+                await self.do(evo.first(RESEARCH_ZERGMELEEWEAPONSLEVEL1))
+                self.melee1 = True
+
+        if self.vespene >= 150:
+            evo = self.units(EVOLUTIONCHAMBER).ready
+            if evo.exists and not self.armor1 and self.minerals >= 150:
+                await self.do(evo.first(RESEARCH_ZERGGROUNDARMORLEVEL1))
+                self.armor1 = True
+
+        if self.units(SPAWNINGPOOL).ready.exists:
+            if larvae.exists and self.can_afford(ZERGLING):
+                await self.do(larvae.random.train(ZERGLING))
+
+        if self.speedlings and (self.state.game_loop - self.speedlings_started) > 1800:
+            target = self.known_enemy_structures.random_or(self.enemy_start_locations[0]).position
+            for zl in self.units(ZERGLING).idle:
+                await self.do(zl.attack(target))
 
         for extractor in self.units(EXTRACTOR).ready:
             self.move_workers_to_extractor(iteration, extractor)
 
         for hatchery in self.units(HATCHERY):
-            minerals_nicely_saturated = hatchery.ideal_harvesters - hatchery.assigned_harvesters is not 0
+            minerals_nicely_saturated = hatchery.ideal_harvesters - hatchery.assigned_harvesters <= 1
 
             # build drones
             if not minerals_nicely_saturated:
@@ -88,7 +112,15 @@ class MyBot(sc2.BotAI):
             if not self.units(SPAWNINGPOOL) and not self.already_pending(SPAWNINGPOOL):
                 if self.can_afford(SPAWNINGPOOL):
                     worker = self.select_build_worker(hatchery, force=True)
-                    await self.build(SPAWNINGPOOL, hatchery, unit=worker)
+                    pos = hatchery.position.to2.towards(self.game_info.map_center, 5)
+                    await self.build(SPAWNINGPOOL, pos, unit=worker)
+
+            # build evolution chamber
+            if not self.units(EVOLUTIONCHAMBER) and not self.already_pending(EVOLUTIONCHAMBER) and (self.units(SPAWNINGPOOL) or self.already_pending(SPAWNINGPOOL)):
+                if self.can_afford(EVOLUTIONCHAMBER):
+                    worker = self.select_build_worker(hatchery, force=True)
+                    pos = hatchery.position.to2.towards(self.game_info.map_center, 5)
+                    await self.build(EVOLUTIONCHAMBER, pos, unit=worker)
 
             await self.create_queens(iteration, hatchery)
             await self.handle_queens(iteration, hatchery)
@@ -96,6 +128,5 @@ class MyBot(sc2.BotAI):
 
         # expansion when affordable
         if self.units(SPAWNINGPOOL) and self.can_afford(HATCHERY) and self.expansion_counter < 1:
-            location = await self.get_next_expansion()
-            await self.build(HATCHERY, location)
+            await self.expand_now()
             self.expansion_counter += 1
