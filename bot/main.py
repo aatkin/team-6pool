@@ -1,11 +1,13 @@
 import json
 from pathlib import Path
 from pprint import pprint
+import math
 
 import sc2
 from sc2 import Race, Difficulty
 from sc2.constants import *
 from sc2.player import Bot, Computer
+from sc2.position import Point2
 
 
 class MyBot(sc2.BotAI):
@@ -25,8 +27,8 @@ class MyBot(sc2.BotAI):
         larvae = self.units(LARVA)
         minerals_nicely_saturated = hatchery.ideal_harvesters - hatchery.assigned_harvesters <= 1
 
-        if iteration % 100 == 0:
-            pprint(vars(self))
+        # if iteration % 100 == 0:
+        #     pprint(vars(self))
 
         if iteration == 0:
             await self.chat_send(f"Name: {self.NAME}")
@@ -99,7 +101,24 @@ class MyBot(sc2.BotAI):
             if larvae.exists and self.can_afford(ZERGLING):
                 await self.do(larvae.random.train(ZERGLING))
 
-        if self.speedlings and (self.state.game_loop - self.speedlings_started) > 1800:
+        if self.speedlings and 1000 < (self.state.game_loop - self.speedlings_started) < 3000:
+            enemy_start = self.enemy_start_locations[0]
+            expansions_pos = self.expansion_locations.keys()
+            closest = None
+            min_dist = 100000
+            for p in expansions_pos:
+                if p == enemy_start: continue
+                dist = math.sqrt((p[0] - enemy_start[0]) ** 2 + (p[1] - enemy_start[1]) ** 2)
+                if dist < min_dist and dist > 10:
+                    min_dist = dist
+                    closest = Point2(p).towards(self.game_info.map_center, 5)
+
+            if closest:
+                for zl in self.units(ZERGLING).idle:
+                    await self.do(zl.attack(closest))
+
+
+        if self.speedlings and (self.state.game_loop - self.speedlings_started) > 3000:
             target = self.known_enemy_structures.random_or(self.enemy_start_locations[0]).position
             for zl in self.units(ZERGLING).idle:
                 await self.do(zl.attack(target))
