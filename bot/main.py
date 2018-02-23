@@ -19,6 +19,7 @@ class MyBot(sc2.BotAI):
     def __init__(self):
         self.drone_counter = 0
         self.speedlings = False
+        self.speedlings_started= 0
 
     async def on_step(self, iteration):
         hatchery = self.units(HATCHERY).ready.first
@@ -70,7 +71,13 @@ class MyBot(sc2.BotAI):
             if sp.exists and self.minerals >= 100 and not self.speedlings:
                 await self.do(sp.first(RESEARCH_ZERGLINGMETABOLICBOOST))
                 self.speedlings = True
+                self.speedlings_started = iteration
 
         if self.units(SPAWNINGPOOL).ready.exists:
             if larvae.exists and self.can_afford(ZERGLING):
                 await self.do(larvae.random.train(ZERGLING))
+
+        if self.speedlings and iteration - self.speedlings_started > seconds_to_ticks(20):
+            target = self.known_enemy_structures.random_or(self.enemy_start_locations[0]).position
+            for zl in self.units(ZERGLING).idle:
+                await self.do(zl.attack(target))
