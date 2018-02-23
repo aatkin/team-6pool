@@ -28,7 +28,7 @@ class MyBot(sc2.BotAI):
         hatchery = self.units(HATCHERY).ready.closest_to(self.workers[0].position)
         larvae = self.units(LARVA)
         minerals_nicely_saturated = (hatchery.ideal_harvesters - hatchery.assigned_harvesters) <= 0
-        should_spawn_overlord = self.supply_left <= 2 and not self.already_pending(OVERLORD) and self.drone_counter != 0
+        should_spawn_overlord = self.supply_left <= 3 and not self.already_pending(OVERLORD) and self.drone_counter != 0
 
         # if iteration % 100 == 0:
         #     print("start", self.game_info.start_locations[0])
@@ -41,7 +41,7 @@ class MyBot(sc2.BotAI):
         if iteration == 666:
             await self.chat_send("666 HELLFIRE")
 
-        if self.supply_left < 3 and not self.already_pending(OVERLORD):
+        if self.supply_left < 4 and not self.already_pending(OVERLORD):
             if self.can_afford(OVERLORD) and larvae.exists:
                 await self.do(larvae.random.train(OVERLORD))
 
