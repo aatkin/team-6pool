@@ -66,6 +66,41 @@ class MyBot(sc2.BotAI):
             mf = self.state.mineral_field.closest_to(idle_worker)
             await self.do(idle_worker.gather(mf))
 
+        for extractor in self.units(EXTRACTOR).ready:
+            await self.move_workers_to_extractor(iteration, extractor)
+
+        for hatchery in self.units(HATCHERY).ready:
+            minerals_nicely_saturated = (hatchery.ideal_harvesters - hatchery.assigned_harvesters) <= 1
+
+            try:
+                larva = self.units(LARVA).closest_to(hatchery)
+            except Exception:
+                larva = None
+
+            await self.create_extractor(iteration, hatchery, minerals_nicely_saturated)
+
+            # build drones
+            if not minerals_nicely_saturated:
+                if self.can_afford(DRONE) and self.supply_left >= 1 and larva is not None:
+                    await self.do(larva.train(DRONE))
+            
+            await self.create_queens(iteration, hatchery)
+            await self.handle_queens(iteration, hatchery)
+
+            # build spawning pool
+            if not self.units(SPAWNINGPOOL) and not self.already_pending(SPAWNINGPOOL):
+                if self.can_afford(SPAWNINGPOOL):
+                    worker = self.select_build_worker(hatchery, force=True)
+                    pos = hatchery.position.to2.towards(self.game_info.map_center, 5)
+                    await self.build(SPAWNINGPOOL, pos, unit=worker)
+
+            # build evolution chamber
+            if not self.units(EVOLUTIONCHAMBER) and not self.already_pending(EVOLUTIONCHAMBER) and (self.units(SPAWNINGPOOL) or self.already_pending(SPAWNINGPOOL)):
+                if self.can_afford(EVOLUTIONCHAMBER):
+                    worker = self.select_build_worker(hatchery, force=True)
+                    pos = hatchery.position.to2.towards(self.game_info.map_center, 5)
+                    await self.build(EVOLUTIONCHAMBER, pos, unit=worker)
+
         if self.supply_left < 3 and not self.already_pending(OVERLORD):
             if self.can_afford(OVERLORD) and larvae.exists:
                 await self.do(larvae.random.train(OVERLORD))
@@ -93,49 +128,26 @@ class MyBot(sc2.BotAI):
             if larvae.exists and self.can_afford(ZERGLING):
                 await self.do(larvae.random.train(ZERGLING))
 
-        if self.speedlings and (self.state.game_loop - self.speedlings_started) > 1800:
+        if self.speedlings and 1000 < (self.state.game_loop - self.speedlings_started) < 3000:
+            enemy_start = self.enemy_start_locations[0]
+            expansions_pos = self.expansion_locations.keys()
+            closest = None
+            min_dist = 100000
+            for p in expansions_pos:
+                if p == enemy_start: continue
+                dist = math.sqrt((p[0] - enemy_start[0]) ** 2 + (p[1] - enemy_start[1]) ** 2)
+                if dist < min_dist and dist > 10:
+                    min_dist = dist
+                    closest = Point2(p).towards(self.game_info.map_center, 5)
+
+            if closest:
+                for zl in self.units(ZERGLING).idle:
+                    await self.do(zl.attack(closest))
+
+        if self.speedlings and (self.state.game_loop - self.speedlings_started) > 3000:
             target = self.known_enemy_structures.random_or(self.enemy_start_locations[0]).position
             for zl in self.units(ZERGLING).idle:
                 await self.do(zl.attack(target))
-
-        for extractor in self.units(EXTRACTOR).ready:
-            await self.move_workers_to_extractor(iteration, extractor)
-
-        for hatchery in self.units(HATCHERY).ready:
-            minerals_nicely_saturated = (hatchery.ideal_harvesters - hatchery.assigned_harvesters) <= 1
-
-            try:
-                larva = self.units(LARVA).closest_to(hatchery)
-            except Exception:
-                larva = None
-
-            print(self.units(LARVA))
-            print(hatchery)
-            print(larva)
-            print(minerals_nicely_saturated)
-
-            # build drones
-            if not minerals_nicely_saturated:
-                if self.can_afford(DRONE) and self.supply_left >= 1 and larva is not None:
-                    await self.do(larva.train(DRONE))
-
-            await self.create_extractor(iteration, hatchery, minerals_nicely_saturated)
-            await self.create_queens(iteration, hatchery)
-            await self.handle_queens(iteration, hatchery)
-
-            # build spawning pool
-            if not self.units(SPAWNINGPOOL) and not self.already_pending(SPAWNINGPOOL):
-                if self.can_afford(SPAWNINGPOOL):
-                    worker = self.select_build_worker(hatchery, force=True)
-                    pos = hatchery.position.to2.towards(self.game_info.map_center, 5)
-                    await self.build(SPAWNINGPOOL, pos, unit=worker)
-
-            # build evolution chamber
-            if not self.units(EVOLUTIONCHAMBER) and not self.already_pending(EVOLUTIONCHAMBER) and (self.units(SPAWNINGPOOL) or self.already_pending(SPAWNINGPOOL)):
-                if self.can_afford(EVOLUTIONCHAMBER):
-                    worker = self.select_build_worker(hatchery, force=True)
-                    pos = hatchery.position.to2.towards(self.game_info.map_center, 5)
-                    await self.build(EVOLUTIONCHAMBER, pos, unit=worker)
 
         # expansion when affordable
         if self.units(SPAWNINGPOOL) and self.can_afford(HATCHERY) and self.units(HATCHERY).ready.amount < 4:
