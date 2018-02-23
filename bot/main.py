@@ -78,7 +78,7 @@ class MyBot(sc2.BotAI):
                 pos = hatchery.position.to2.towards(self.game_info.map_center, 5)
                 await self.build(EVOLUTIONCHAMBER, pos, unit=worker)
 
-        if self.can_afford(QUEEN) and self.queen_counter < 2:
+        if self.can_afford(QUEEN) and self.queen_counter < 1:
             queue_full = await self.do(hatchery.train(QUEEN))
             if not queue_full:
                 self.queen_counter += 1
