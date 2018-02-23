@@ -70,3 +70,7 @@ class MyBot(sc2.BotAI):
             if sp.exists and self.minerals >= 100 and not self.speedlings:
                 await self.do(sp.first(RESEARCH_ZERGLINGMETABOLICBOOST))
                 self.speedlings = True
+
+        if self.units(SPAWNINGPOOL).ready.exists:
+            if larvae.exists and self.can_afford(ZERGLING):
+                await self.do(larvae.random.train(ZERGLING))
