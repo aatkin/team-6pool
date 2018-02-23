@@ -21,9 +21,10 @@ class MyBot(sc2.BotAI):
         self.melee1 = False
         self.armor1 = False
         self.queen_counter = 0
+        self.hatchery_count = 1
 
     async def on_step(self, iteration):
-        hatchery = self.units(HATCHERY).ready.first
+        hatchery = self.units(HATCHERY).ready.closest_to(self.game_info.start_locations[0])
         larvae = self.units(LARVA)
         minerals_nicely_saturated = hatchery.ideal_harvesters - hatchery.assigned_harvesters <= 1
 
@@ -40,7 +41,7 @@ class MyBot(sc2.BotAI):
             if self.can_afford(OVERLORD) and larvae.exists:
                 await self.do(larvae.random.train(OVERLORD))
 
-        if not minerals_nicely_saturated:
+        if not minerals_nicely_saturated and self.drone_counter < 10:
             if self.can_afford(DRONE) and self.supply_left >= 1 and larvae.exists:
                 self.drone_counter += 1
                 await self.do(larvae.random.train(DRONE))
@@ -117,7 +118,6 @@ class MyBot(sc2.BotAI):
                 for zl in self.units(ZERGLING).idle:
                     await self.do(zl.attack(closest))
 
-
         if self.speedlings and (self.state.game_loop - self.speedlings_started) > 3000:
             target = self.known_enemy_structures.random_or(self.enemy_start_locations[0]).position
             for zl in self.units(ZERGLING).idle:
@@ -127,3 +127,7 @@ class MyBot(sc2.BotAI):
             abilities = await self.get_available_abilities(queen)
             if AbilityId.EFFECT_INJECTLARVA in abilities:
                 await self.do(queen(EFFECT_INJECTLARVA, hatchery))
+
+        if self.can_afford(HATCHERY) and self.units(SPAWNINGPOOL).ready.exists and self.units(EVOLUTIONCHAMBER).ready.exists and self.hatchery_count < 2:
+            self.hatchery_count += 1
+            await self.expand_now()
