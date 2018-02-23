@@ -19,7 +19,9 @@ class MyBot(sc2.BotAI):
     def __init__(self):
         self.drone_counter = 0
         self.speedlings = False
-        self.speedlings_started= 0
+        self.speedlings_started = 0
+        self.melee1 = False
+        self.armor1 = False
 
     async def on_step(self, iteration):
         hatchery = self.units(HATCHERY).ready.first
@@ -66,12 +68,30 @@ class MyBot(sc2.BotAI):
                 pos = hatchery.position.to2.towards(self.game_info.map_center, 5)
                 await self.build(SPAWNINGPOOL, pos, unit=worker)
 
+        if not self.units(EVOLUTIONCHAMBER) and not self.already_pending(EVOLUTIONCHAMBER) and (self.units(SPAWNINGPOOL) or self.already_pending(SPAWNINGPOOL)):
+            if self.can_afford(EVOLUTIONCHAMBER):
+                worker = self.select_build_worker(hatchery, force=True)
+                pos = hatchery.position.to2.towards(self.game_info.map_center, 5)
+                await self.build(EVOLUTIONCHAMBER, pos, unit=worker)
+
         if self.vespene >= 100:
             sp = self.units(SPAWNINGPOOL).ready
             if sp.exists and self.minerals >= 100 and not self.speedlings:
                 await self.do(sp.first(RESEARCH_ZERGLINGMETABOLICBOOST))
                 self.speedlings = True
                 self.speedlings_started = iteration
+
+        if self.vespene >= 100:
+            evo = self.units(EVOLUTIONCHAMBER).ready
+            if evo.exists and not self.melee1 and self.minerals >= 100:
+                await self.do(evo.first(RESEARCH_ZERGMELEEWEAPONSLEVEL1))
+                self.melee1 = True
+
+        if self.vespene >= 150:
+            evo = self.units(EVOLUTIONCHAMBER).ready
+            if evo.exists and not self.armor1 and self.minerals >= 150:
+                await self.do(evo.first(RESEARCH_ZERGGROUNDARMORLEVEL1))
+                self.armor1 = True
 
         if self.units(SPAWNINGPOOL).ready.exists:
             if larvae.exists and self.can_afford(ZERGLING):
