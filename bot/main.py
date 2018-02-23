@@ -18,6 +18,7 @@ class MyBot(sc2.BotAI):
 
     def __init__(self):
         self.drone_counter = 0
+        self.speedlings = False
 
     async def on_step(self, iteration):
         hatchery = self.units(HATCHERY).ready.first
@@ -63,3 +64,9 @@ class MyBot(sc2.BotAI):
                 worker = self.select_build_worker(hatchery, force=True)
                 pos = hatchery.position.to2.towards(self.game_info.map_center, 5)
                 await self.build(SPAWNINGPOOL, pos, unit=worker)
+
+        if self.vespene >= 100:
+            sp = self.units(SPAWNINGPOOL).ready
+            if sp.exists and self.minerals >= 100 and not self.speedlings:
+                await self.do(sp.first(RESEARCH_ZERGLINGMETABOLICBOOST))
+                self.speedlings = True
