@@ -18,6 +18,7 @@ class MyBot(sc2.BotAI):
         self.speedlings_started = 0
         self.melee1 = False
         self.armor1 = False
+        self.queen_counter = 0
 
     async def on_step(self, iteration):
         hatchery = self.units(HATCHERY).ready.first
@@ -70,6 +71,11 @@ class MyBot(sc2.BotAI):
                 pos = hatchery.position.to2.towards(self.game_info.map_center, 5)
                 await self.build(EVOLUTIONCHAMBER, pos, unit=worker)
 
+        if self.can_afford(QUEEN) and self.queen_counter < 2:
+            queue_full = await self.do(hatchery.train(QUEEN))
+            if not queue_full:
+                self.queen_counter += 1
+
         if self.vespene >= 100:
             sp = self.units(SPAWNINGPOOL).ready
             if sp.exists and self.minerals >= 100 and not self.speedlings:
@@ -97,3 +103,8 @@ class MyBot(sc2.BotAI):
             target = self.known_enemy_structures.random_or(self.enemy_start_locations[0]).position
             for zl in self.units(ZERGLING).idle:
                 await self.do(zl.attack(target))
+
+        for queen in self.units(QUEEN).idle:
+            abilities = await self.get_available_abilities(queen)
+            if AbilityId.EFFECT_INJECTLARVA in abilities:
+                await self.do(queen(EFFECT_INJECTLARVA, hatchery))
