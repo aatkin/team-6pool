@@ -61,4 +61,5 @@ class MyBot(sc2.BotAI):
         if not self.units(SPAWNINGPOOL) and not self.already_pending(SPAWNINGPOOL):
             if self.can_afford(SPAWNINGPOOL):
                 worker = self.select_build_worker(hatchery, force=True)
-                await self.build(SPAWNINGPOOL, hatchery, unit=worker)
+                pos = hatchery.position.to2.towards(self.game_info.map_center, 5)
+                await self.build(SPAWNINGPOOL, pos, unit=worker)
