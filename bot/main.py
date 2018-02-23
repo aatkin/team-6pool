@@ -25,6 +25,7 @@ class MyBot(sc2.BotAI):
         self.building_overlord = False
 
     async def on_step(self, iteration):
+        hatchery = self.units(HATCHERY).ready.first
         larvae = self.units(LARVA)
 
         if iteration % 100 == 0:
@@ -45,7 +46,12 @@ class MyBot(sc2.BotAI):
                 self.building_overlord = True
                 await self.do(larvae.random.train(OVERLORD))
 
-        if self.drone_counter < 10:
+        if self.drone_counter < 5:
             if self.can_afford(DRONE) and self.supply_left >= 1 and larvae.exists:
                 self.drone_counter += 1
                 await self.do(larvae.random.train(DRONE))
+
+        if not self.units(SPAWNINGPOOL) and not self.already_pending(SPAWNINGPOOL):
+            if self.can_afford(SPAWNINGPOOL):
+                worker = self.select_build_worker(hatchery, force=True)
+                await self.build(SPAWNINGPOOL, hatchery, unit=worker)
